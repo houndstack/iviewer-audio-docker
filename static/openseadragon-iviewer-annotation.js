@@ -58,7 +58,7 @@ class IViewerAnnotation {
 
         
         this.recorderQueue= []
-        this.annotationList = []
+        this.annotationlist = []
         this._viewer = viewer;
         this.cfs = configs || {};
         this._id = configs?.id || 'osd-overlaycanvas-' + (++IViewerAnnotation.count);
@@ -602,7 +602,7 @@ class IViewerAnnotation {
         this.recorderQueue = []
         this.annotationlist = []
     }
-    recordAnnotations(text) {
+    async recordAnnotations(text) {
         let index = 0;
         console.log(this.recorderQueue)
         let i = 0
@@ -612,13 +612,17 @@ class IViewerAnnotation {
             if(text[index]['timestamp'][0]>=this.recorderQueue[i]['timestamp']&&text[index]['timestamp'][0]<=this.recorderQueue[i+1]['timestamp']){
                 if('description' in this.recorderQueue[i]){
                     this.recorderQueue[i].description += text[index]['text']
+                    this.recorderQueue[i].timestamp ??= text[index]['timestamp'][0]
                     console.log(this.recorderQueue[i], text[index]['text'])
                     this.annotationlist.pop()
                     this.annotationlist.push(this.recorderQueue[i])
                 }
                 else{
                     this.recorderQueue[i].description = text[index]['text']
+                    this.recorderQueue[i].timestamp = text[index]['timestamp'][0]
+                    console.log(this.recorderQueue[i])
                     this.annotationlist.push(this.recorderQueue[i])
+                    //console.log("annotation listy", this.annotationlist)
                 }
                 
                 index++;
@@ -628,9 +632,17 @@ class IViewerAnnotation {
             i++
         }
         console.log(this.annotationlist)
-        for(let i = 0;i<this.annotationlist.length;i++){
-            let api = this.APIs.annoInsertAPI;
-            createAnnotation(api, this.annotationlist[i]);
+        const batchSize = 5;
+    
+        for (let i = 0; i < this.annotationlist.length; i += batchSize) {
+            const batch = this.annotationlist.slice(i, i + batchSize).map(annotation => {
+                let api = this.APIs.annoInsertAPI;
+                return createAnnotation(api, annotation);
+            });
+
+            // Use Promise.all to handle the batch of requests concurrently
+            await Promise.all(batch);
+            console.log('Batch processed');
         }
         
     }
