@@ -380,24 +380,64 @@ function w3c2konva(w3cAnnotation) {
     return convertedObject;
 }
 
-function createAnnotation(api, query) {
-    console.trace()
+// function createAnnotation(api, query) {
+//     console.trace()
+//     console.log("createAnnotation", api, query);
+//     return fetch(api, {
+//         method: 'POST',
+//         headers: {
+//             'Content-Type': 'application/json'
+//         },
+//         body: JSON.stringify(query)
+//     }).then(response => {
+//         if (!response.ok) {
+//             throw new Error('Network response was not ok');
+//         }
+//         return response.json();
+//     }).catch(error => {
+//         console.error('There was a problem with the fetch operation:', error);
+//         throw error;
+//     });
+// }
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function createAnnotation(api, query, retries = 10, initialBackoff = 100) {
+    console.trace();
     console.log("createAnnotation", api, query);
-    return fetch(api, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(query)
-    }).then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
+
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(api, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(query)
+            });
+
+            if (!response.ok) {
+                if (response.status === 409 && i < retries - 1) {
+                    // Retry with exponential backoff
+                    const backoff = initialBackoff * Math.pow(2, i); // 100ms, 200ms, 400ms, etc.
+                    console.log(`Retry ${i + 1} - waiting for ${backoff}ms`);
+                    await delay(backoff);
+                    continue;
+                } else {
+                    throw new Error('Network response was not ok');
+                }
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('There was a problem with the fetch operation:', error);
+            if (i >= retries - 1) {
+                throw error; // Re-throw the error if all retries are exhausted
+            }
         }
-        return response.json();
-    }).catch(error => {
-        console.error('There was a problem with the fetch operation:', error);
-        throw error;
-    });
+    }
 }
 
 function readAnnotation(api) {
