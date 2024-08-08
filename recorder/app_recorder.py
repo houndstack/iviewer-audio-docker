@@ -50,12 +50,10 @@ pipe = pipeline(
   chunk_length_s=30,
   device=device,
 )
-text_dict = {}
-
 last_path = ""
 timestamp = 0
 last_text = ""
-def transcribe(x, request=gr.Request):
+def transcribe(x):
     file_path = x
     with open(file_path, "rb") as f:
         audio_data = f.read()
@@ -74,33 +72,25 @@ def transcribe(x, request=gr.Request):
     y /= np.max(np.abs(y))
     sample = {'array': y, 'sampling_rate': sr}
     text = pipe(sample.copy(), batch_size=8, return_timestamps=True, generate_kwargs={"task": "translate"})["chunks"]
-    print(dir(request))
-    global text_dict
-    request_dict = dict(request.query_params)
-    request_key = request_dict['userId'] + '_' + request_dict['imgId']
-    text_dict[request_key] = text
-    print(text_dict)
+    global last_path
+    last_path = save_path
+    global last_text
+    last_text = text
     return text
 
-def starttimer(request=gr.Request):
-    if request:
-        print(request)
-        global text_dict
-        request_dict = dict(request.query_params)
-        print(request_dict)
-        request_key = request_dict['userId'] + '_' + request_dict['imgId'] + '_timestamp'
-        text_dict[request_key] = round(time.time() * 1000)
-
+def starttimer():
+    global timestamp 
+    timestamp = round(time.time() * 1000)
 
 with gr.Blocks() as demo:
-    inp = gr.Audio(sources=['microphone'], type='filepath')
+    inp = gr.Audio(sources=['upload'], type='filepath')
     out = gr.Textbox()
     timeout = gr.Textbox()
-    inp.start_recording(starttimer)
+    inp.upload(starttimer)
     inp.change(transcribe, inp, out)
 
 app = FastAPI()
-#demo.queue(default_concurrency_limit=10)
+# #demo.queue(default_concurrency_limit=10)
 app = gr.mount_gradio_app(app, demo, path="/recorder")
 app.add_middleware(
     CORSMiddleware,
@@ -130,6 +120,7 @@ class Annotation(Base):
     label = Column(String, index=True)
     description = Column(String)
     annotator = Column(String, index=True)
+    timestamp = Column(Integer)
     #project = Column(String, index=True)
     #created_at = Column(DateTime, default=datetime.utcnow)
     
@@ -176,8 +167,10 @@ async def get_sessionmaker(image_id):
     database_url = f"sqlite+aiosqlite:///{db_path}"
     print(database_url)
     engine = create_async_engine(database_url)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
-
+    
     return async_session
 
 
@@ -214,6 +207,7 @@ async def insert_data(image_id: str, item=Body(...), session=Depends(get_session
                 'label': format_labels(item.get('label', '')),
                 'description': item.get('description', ''),
                 'annotator': item.get('annotator', ''),
+                'timestamp': item['timestamp']
                 # 'project': item.get('project', ''),
             }
             if obj['xc'] is None:
