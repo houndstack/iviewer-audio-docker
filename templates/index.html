@@ -48,7 +48,7 @@
         const yoloAPI = `http://${server}:10030/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=yolov8-lung`;
         const chatAPI = `http://${server}:10040/copilot?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=gpt4o`;
 
-        const database_url = `${server}:10050/annotation`;
+        const database_url = `${server}:9050/annotation`;
         const createDB = `http://${database_url}/create?image_id=${imgId}`;
         const getAnnotator = `http://${database_url}/annotators?image_id=${imgId}`;
         const getLabels = `http://${database_url}/labels?image_id=${imgId}`;
