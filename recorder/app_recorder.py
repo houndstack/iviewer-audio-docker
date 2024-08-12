@@ -83,10 +83,10 @@ def starttimer():
     timestamp = round(time.time() * 1000)
 
 with gr.Blocks() as demo:
-    inp = gr.Audio(sources=['upload'], type='filepath')
+    inp = gr.Audio(sources=['microphone'], type='filepath')
     out = gr.Textbox()
     timeout = gr.Textbox()
-    inp.upload(starttimer)
+    inp.start_recording(starttimer)
     inp.change(transcribe, inp, out)
 
 app = FastAPI()
